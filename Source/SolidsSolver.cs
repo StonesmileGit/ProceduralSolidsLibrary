@@ -8,19 +8,50 @@ namespace ProceduralSolidsLibrary
 
 		public PropellantConfig propellant;
 		public Casing casing;
-		public Nozzle nozzle;
-		public bool thrustIsInput;
-		public bool throatAreaIsInput;
-		public bool thrustPercentIsInput;
+		public NozzleConfig nozzle;
+		public bool thrustIsInput = false;
+		public bool throatAreaIsInput = false;
+		public bool thrustPercentIsInput = false;
+		public bool combustionPressureIsInput = false;
 
-		public SolidsSolver() { casing = new Casing(); }
-		public SolidsSolver(PropellantConfig propellant, CasingMaterialConfig casingMaterial, Nozzle nozzle, float length, float diameter)
+		public SolidsSolver() { casing = new Casing(); nozzle = new NozzleConfig(); }
+		// public SolidsSolver(PropellantConfig propellant, CasingMaterialConfig casingMaterial, Nozzle nozzle, float length, float diameter)
+		// {
+		// 	this.propellant = propellant;
+		// 	this.nozzle = nozzle;
+		// 	casing = new Casing(casingMaterial, length - diameter, diameter);
+		// 	Length = length;
+		// 	Diameter = diameter;
+		// }
+
+		public static SolidsSolver ThrustAsInput(PropellantConfig initialPropellant, CasingMaterialConfig initialCasingMaterial, float initialThrust)
 		{
-			this.propellant = propellant;
-			this.nozzle = nozzle;
-			casing = new Casing(casingMaterial, length - diameter, diameter);
-			Length = length;
-			Diameter = diameter;
+			var solver = new SolidsSolver();
+			solver.propellant = initialPropellant;
+			solver.casing.material = initialCasingMaterial;
+			solver.thrustIsInput = true;
+			solver.Thrust = initialThrust;
+			return solver;
+		}
+
+		public static SolidsSolver ThroatAreaAsInput(PropellantConfig initialPropellant, CasingMaterialConfig initialCasingMaterial, float initialThroatArea)
+		{
+			var solver = new SolidsSolver();
+			solver.propellant = initialPropellant;
+			solver.casing.material = initialCasingMaterial;
+			solver.throatAreaIsInput = true;
+			solver.ThroatArea = initialThroatArea;
+			return solver;
+		}
+
+		public static SolidsSolver PressureAsInput(PropellantConfig initialPropellant, CasingMaterialConfig initialCasingMaterial, float initialPressure)
+		{
+			var solver = new SolidsSolver();
+			solver.propellant = initialPropellant;
+			solver.casing.material = initialCasingMaterial;
+			solver.combustionPressureIsInput = true;
+			solver.CombustionPressure = initialPressure;
+			return solver;
 		}
 
 		private float _length;
@@ -50,10 +81,11 @@ namespace ProceduralSolidsLibrary
 		{
 			get
 			{
-				return (thrustIsInput, throatAreaIsInput) switch
+				return (thrustIsInput, throatAreaIsInput, combustionPressureIsInput) switch
 				{
-					(true, false) => _thrust,
-					(false, true) => g0 * Isp * MassFlow,
+					(true, false, false) => _thrust,
+					(false, true, false) => g0 * Isp * MassFlow,
+					(false, false, true) => g0 * Isp * MassFlow,
 					_ => throw new System.Exception("Invalid boolean combination in 'Thrust'")
 				};
 			}
@@ -68,10 +100,11 @@ namespace ProceduralSolidsLibrary
 		{
 			get
 			{
-				return (thrustIsInput, throatAreaIsInput) switch
+				return (thrustIsInput, throatAreaIsInput, combustionPressureIsInput) switch
 				{
-					(true, false) => BurnArea / (Mathf.Pow(CombustionPressure, 1f - propellant.burnRateExponent) / (propellant.density * propellant.burnRateCoeff * propellant.CharacVel)),
-					(false, true) => _throatArea,
+					(true, false, false) => BurnArea / (Mathf.Pow(CombustionPressure, 1f - propellant.burnRateExponent) / (propellant.density * propellant.burnRateCoeff * propellant.characVel)),
+					(false, true, false) => _throatArea,
+					(false, false, true) => BurnArea / (Mathf.Pow(CombustionPressure, 1f - propellant.burnRateExponent) / (propellant.density * propellant.burnRateCoeff * propellant.characVel)),
 					_ => throw new System.Exception("Invalid boolean combination in 'throatArea'")
 				};
 			}
@@ -81,12 +114,13 @@ namespace ProceduralSolidsLibrary
 			}
 		}
 
-		public float Isp => nozzle.nozzleCoeff * propellant.CharacVel / g0;
+		public float Isp => nozzle.nozzleCoeff * propellant.characVel / g0;
 		public float MassFlow =>
-			(thrustIsInput, throatAreaIsInput) switch
+			(thrustIsInput, throatAreaIsInput, combustionPressureIsInput) switch
 			{
-				(true, false) => _thrust / (g0 * Isp),
-				(false, true) => CombustionPressure * ThroatArea / propellant.CharacVel,
+				(true, false, false) => _thrust / (g0 * Isp),
+				(false, true, false) => CombustionPressure * ThroatArea / propellant.characVel,
+				(false, false, true) => CombustionPressure * ThroatArea / propellant.characVel,
 				_ => throw new System.Exception("Invalid boolean combination in 'massFlow'")
 			};
 
@@ -95,14 +129,20 @@ namespace ProceduralSolidsLibrary
 		{
 			get
 			{
-				_combustionPressure = (thrustIsInput, throatAreaIsInput) switch
+				_combustionPressure = (thrustIsInput, throatAreaIsInput, combustionPressureIsInput) switch
 				{
-					(true, false) => Mathf.Pow(MassFlow / (BurnArea * propellant.density * propellant.burnRateCoeff), 1f / propellant.burnRateExponent),
-					(false, true) => Mathf.Pow(BurnArea / ThroatArea * propellant.density * propellant.burnRateCoeff * propellant.CharacVel, 1f / (1f - propellant.burnRateExponent)),
+					(true, false, false) => Mathf.Pow(MassFlow / (BurnArea * propellant.density * propellant.burnRateCoeff), 1f / propellant.burnRateExponent),
+					(false, true, false) => Mathf.Pow(BurnArea / ThroatArea * propellant.density * propellant.burnRateCoeff * propellant.characVel, 1f / (1f - propellant.burnRateExponent)),
+					(false, false, true) => _combustionPressure,
 					_ => throw new System.Exception("Invalid boolean combination in 'combustionPressure'")
 				};
 				casing.mawp = _combustionPressure;
 				return _combustionPressure;
+			}
+			set
+			{
+				_combustionPressure = value;
+				casing.mawp = _combustionPressure;
 			}
 		}
 		private readonly float maxThrust = 100_000_000f;

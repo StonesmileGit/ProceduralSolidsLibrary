@@ -15,27 +15,30 @@ namespace ProceduralSolidsLibrary
 		public float burnRateExponent;
 		[Persistent]
 		public float density;
+		// [Persistent]
+		// public float combustionTemp;
+		// [Persistent]
+		// public float heatCapacityRatio;
+		// [Persistent]
+		// public float molarMass;
 		[Persistent]
-		public float combustionTemp;
-		[Persistent]
-		public float heatCapacityRatio;
-		[Persistent]
-		public float molarMass;
+		public float characVel;
 
-		public float CharacVel => Mathf.Sqrt(heatCapacityRatio * R * molarMass * combustionTemp) / (heatCapacityRatio * Mathf.Sqrt(Mathf.Pow(2 / (heatCapacityRatio + 1), (heatCapacityRatio + 1)/(heatCapacityRatio - 1))));
+		// public float CharacVel => Mathf.Sqrt(heatCapacityRatio * R * combustionTemp / molarMass) / (heatCapacityRatio * Mathf.Sqrt(Mathf.Pow(2 / (heatCapacityRatio + 1), (heatCapacityRatio + 1)/(heatCapacityRatio - 1))));
 
 		/// <summary>
-		/// <para><paramref name="molarMass"></paramref> is in g / mol</para>
+		/// <para><paramref name="molarMass"></paramref> is in kg / mol</para>
 		/// <para><paramref name="density"></paramref> is in kg / m^3</para>
 		/// </summary>
-		public PropellantConfig(float burnRateCoeff, float burnRateExponent, float density, float combustionTemp, float heatCapacityRatio, float molarMass)
+		public PropellantConfig(float burnRateCoeff, float burnRateExponent, float density, float characVel)//, float combustionTemp, float heatCapacityRatio, float molarMass)
 		{
-			this.burnRateCoeff = burnRateCoeff / 1_000_000f; // TODO: Why is 1M needed here?
+			this.burnRateCoeff = burnRateCoeff;
 			this.burnRateExponent = burnRateExponent;
 			this.density = density;
-			this.combustionTemp = combustionTemp;
-			this.heatCapacityRatio = heatCapacityRatio;
-			this.molarMass = molarMass;
+			this.characVel = characVel;
+			// this.combustionTemp = combustionTemp;
+			// this.heatCapacityRatio = heatCapacityRatio;
+			// this.molarMass = molarMass;
 		}
 		public PropellantConfig() {}
 		public PropellantConfig(ConfigNode node)
@@ -67,16 +70,16 @@ namespace ProceduralSolidsLibrary
 		[Persistent]
 		public float density;
 		[Persistent]
-		public float mats;
+		public float tensileStrength;
 		[Persistent]
 		public float corrosionSafety = 0f;
 		[Persistent]
 		public float weldEff = 1f;
 
-		public CasingMaterialConfig(float density, float mats, float corrosionSafety = 0f, float weldEff = 1f)
+		public CasingMaterialConfig(float density, float tensileStrength, float corrosionSafety = 0f, float weldEff = 1f)
 		{
 			this.density = density;
-			this.mats = mats;
+			this.tensileStrength = tensileStrength;
 			this.corrosionSafety = corrosionSafety;
 			this.weldEff = weldEff;
 		}
@@ -117,7 +120,7 @@ namespace ProceduralSolidsLibrary
 		}
 
 		// FIXME: Currently clamping thickness here.
-		public float Thickness => Mathf.Min(diameter / 2f, (mawp * (diameter - material.corrosionSafety) + 2f * material.mats * material.weldEff * material.corrosionSafety) / (2f * material.mats * material.weldEff + mawp));
+		public float Thickness => Mathf.Min(diameter / 2f, (mawp * (diameter - material.corrosionSafety) + 2f * material.tensileStrength * material.weldEff * material.corrosionSafety) / (2f * material.tensileStrength * material.weldEff + mawp));
 
 		public float InnerVolume => PillVolume(cylinderLength - diameter, diameter - 2 * Thickness);
 		private float Volume => PillVolume(cylinderLength - diameter, diameter) - InnerVolume;
@@ -131,13 +134,41 @@ namespace ProceduralSolidsLibrary
 		}
 	}
 
-	public class Nozzle
+	public class NozzleConfig : IConfigNode
 	{
-		public float nozzleCoeff;
+		public const string nodeName = "SRBLIB_NOZZLE_DEFINITION";
 
-		public Nozzle(float nozzleCoeff)
+		[Persistent]
+		public string name;
+		[Persistent]
+		public float nozzleCoeff; // Is this needed with atmo curve?
+		[Persistent]
+		public FloatCurve atmosphereCurve; // Currently normalized to 1 and nozzleCoeff is used to scale
+		[Persistent]
+		public float gimbalRange = 0f;
+
+		public NozzleConfig() { nozzleCoeff = 1f; }
+		public NozzleConfig(float nozzleCoeff)
 		{
 			this.nozzleCoeff = nozzleCoeff;
+		}
+		public NozzleConfig(ConfigNode node)
+		{
+			Load(node);
+		}
+
+		public void Load(ConfigNode node)
+		{
+			if (! (node.name.Equals(nodeName) && node.HasValue("name")))
+				return;
+
+			ConfigNode.LoadObjectFromConfig(this, node);
+		}
+
+		public void Save(ConfigNode node)
+		{
+			if (name == null) return;
+			ConfigNode.CreateConfigFromObject(this, node);
 		}
 	}
 }

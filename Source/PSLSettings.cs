@@ -9,6 +9,7 @@ namespace ProceduralSolidsLibrary
 		{
 			LoadPropellants();
 			LoadCasingMaterials();
+			LoadNozzles();
 		}
 
 		public static readonly Dictionary<string, PropellantConfig> propellantConfigs = new Dictionary<string, PropellantConfig>();
@@ -30,6 +31,17 @@ namespace ProceduralSolidsLibrary
 			{
 				CasingMaterialConfig conf = ConfigNode.CreateObjectFromConfig<CasingMaterialConfig>(propellantNode);
 				casingMaterialConfigs.Add(conf.name, conf);
+			}
+		}
+
+		public static readonly Dictionary<string, NozzleConfig> nozzleConfigs = new Dictionary<string, NozzleConfig>();
+		public static void LoadNozzles()
+		{
+			nozzleConfigs.Clear();
+			foreach (ConfigNode nozzleNode in GameDatabase.Instance.GetConfigNodes(NozzleConfig.nodeName))
+			{
+				NozzleConfig conf = ConfigNode.CreateObjectFromConfig<NozzleConfig>(nozzleNode);
+				nozzleConfigs.Add(conf.name, conf);
 			}
 		}
 	}
